@@ -14,8 +14,9 @@ use std::process::ExitCode;
 
 use clap::Parser;
 use clean_big_targets::{
-    Cli, TargetDirInfo, calculate_dir_size, find_target_dirs, format_size, handle_deletion,
+    Cli, TargetDirInfo, calculate_dir_size, find_target_dirs, handle_deletion,
 };
+use humanize_bytes::humanize_bytes_decimal;
 use rayon::prelude::*;
 
 fn main() -> ExitCode {
@@ -76,11 +77,15 @@ fn main() -> ExitCode {
         println!("{:>10}  PATH", "SIZE");
         println!("{}", "-".repeat(80));
         for info in &target_info {
-            println!("{:>10}  {}", format_size(info.size), info.path.display());
+            println!(
+                "{:>10}  {}",
+                humanize_bytes_decimal!(info.size),
+                info.path.display()
+            );
         }
         let total_size: u64 = target_info.iter().map(|i| i.size).sum();
         println!("{}", "-".repeat(80));
-        println!("{:>10}  Total", format_size(total_size));
+        println!("{:>10}  Total", humanize_bytes_decimal!(total_size));
     } else if let Err(e) = handle_deletion(&target_info, cli.force) {
         eprintln!("Error during deletion: {}", e);
         return ExitCode::FAILURE;

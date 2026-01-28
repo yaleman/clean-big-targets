@@ -6,6 +6,7 @@ use std::{
 
 use clap::Parser;
 use dialoguer::MultiSelect;
+use humanize_bytes::humanize_bytes_decimal;
 
 #[derive(Parser)]
 pub struct Cli {
@@ -74,33 +75,19 @@ pub fn calculate_dir_size(path: &PathBuf) -> std::io::Result<u64> {
     Ok(total_size)
 }
 
-pub fn format_size(size: u64) -> String {
-    const UNITS: &[&str] = &["B", "KB", "MB", "GB", "TB"];
-    let mut size_f = size as f64;
-    let mut unit_idx = 0;
-
-    while size_f >= 1024.0 && unit_idx < UNITS.len() - 1 {
-        size_f /= 1024.0;
-        unit_idx += 1;
-    }
-
-    if unit_idx == 0 {
-        format!("{} {}", size, UNITS[unit_idx])
-    } else {
-        format!("{:.2} {}", size_f, UNITS[unit_idx])
-    }
-}
-
 pub fn handle_deletion(target_info: &[TargetDirInfo], force: bool) -> std::io::Result<()> {
     // Check if we can interact with the user
 
     if force {
         for info in target_info {
-            println!("Deleting {:?}...", info.path);
             match fs::remove_dir_all(&info.path) {
-                Ok(_) => println!("  Deleted successfully"),
+                Ok(_) => println!(
+                    "Deleted '{}' successfully, ({})",
+                    info.path.display(),
+                    humanize_bytes_decimal!(info.size)
+                ),
                 Err(e) => {
-                    eprintln!("  Failed to delete: '{}' - giving up now!", e);
+                    eprintln!("Failed to delete: '{}' - giving up now!", e);
                     return Err(e);
                 }
             }
@@ -113,7 +100,13 @@ pub fn handle_deletion(target_info: &[TargetDirInfo], force: bool) -> std::io::R
         println!("Prompting...");
         let items: Vec<String> = target_info
             .iter()
-            .map(|info| format!("{:>10}  {}", format_size(info.size), info.path.display()))
+            .map(|info| {
+                format!(
+                    "{:>10}  {}",
+                    humanize_bytes_decimal!(info.size),
+                    info.path.display()
+                )
+            })
             .collect();
 
         let selections = MultiSelect::new()
@@ -129,11 +122,14 @@ pub fn handle_deletion(target_info: &[TargetDirInfo], force: bool) -> std::io::R
 
         for &idx in &selections {
             let info = &target_info[idx];
-            println!("Deleting {:?}...", info.path);
             match fs::remove_dir_all(&info.path) {
-                Ok(_) => println!("  Deleted successfully"),
+                Ok(_) => println!(
+                    "Deleted '{}' successfully, ({})",
+                    info.path.display(),
+                    humanize_bytes_decimal!(info.size)
+                ),
                 Err(e) => {
-                    eprintln!("  Failed to delete: {}", e);
+                    eprintln!("Failed to delete: {}", e);
                     return Err(e);
                 }
             }
@@ -149,37 +145,6 @@ mod tests {
     use std::fs::File;
     use std::io::Write;
     use tempfile::TempDir;
-
-    #[test]
-    fn test_format_size_bytes() {
-        assert_eq!(format_size(0), "0 B");
-        assert_eq!(format_size(1), "1 B");
-        assert_eq!(format_size(1023), "1023 B");
-    }
-
-    #[test]
-    fn test_format_size_kilobytes() {
-        assert_eq!(format_size(1024), "1.00 KB");
-        assert_eq!(format_size(1536), "1.50 KB");
-        assert_eq!(format_size(2048), "2.00 KB");
-    }
-
-    #[test]
-    fn test_format_size_megabytes() {
-        assert_eq!(format_size(1024 * 1024), "1.00 MB");
-        assert_eq!(format_size(1024 * 1024 * 3 / 2), "1.50 MB");
-    }
-
-    #[test]
-    fn test_format_size_gigabytes() {
-        assert_eq!(format_size(1024 * 1024 * 1024), "1.00 GB");
-        assert_eq!(format_size(1024 * 1024 * 1024 * 5 / 2), "2.50 GB");
-    }
-
-    #[test]
-    fn test_format_size_terabytes() {
-        assert_eq!(format_size(1024u64 * 1024 * 1024 * 1024), "1.00 TB");
-    }
 
     #[test]
     fn test_calculate_dir_size_empty() {
@@ -299,6 +264,7 @@ mod tests {
         assert!(size > 0, "Package directory should have non-zero size");
 
         // Print size for informational purposes (visible with --nocapture)
-        eprintln!("Package directory size: {}", format_size(size));
+        eprintln!("Package directory size: {}", humanize_bytes_decimal!(size));
+        assert!(humanize_bytes_decimal!(size).ends_with(" MB"))
     }
 }
