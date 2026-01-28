@@ -1,5 +1,6 @@
 use std::{
     fs,
+    io::IsTerminal,
     path::{Path, PathBuf},
 };
 
@@ -14,6 +15,8 @@ pub struct Cli {
     pub target_dir: PathBuf,
     #[clap(short = 'D', long)]
     pub delete: bool,
+    #[clap(long, requires = "delete")]
+    pub force: bool,
 }
 
 #[derive(Debug)]
@@ -88,37 +91,51 @@ pub fn format_size(size: u64) -> String {
     }
 }
 
-pub fn handle_deletion(target_info: &[TargetDirInfo]) -> std::io::Result<()> {
+pub fn handle_deletion(target_info: &[TargetDirInfo], force: bool) -> std::io::Result<()> {
     // Check if we can interact with the user
-    if !atty::is(atty::Stream::Stdin) {
-        eprintln!("Cannot prompt for deletion: not running in interactive terminal");
-        return Ok(());
-    }
 
-    let items: Vec<String> = target_info
-        .iter()
-        .map(|info| format!("{:>10}  {}", format_size(info.size), info.path.display()))
-        .collect();
+    if force {
+        for info in target_info {
+            println!("Deleting {:?}...", info.path);
+            match fs::remove_dir_all(&info.path) {
+                Ok(_) => println!("  Deleted successfully"),
+                Err(e) => {
+                    eprintln!("  Failed to delete: '{}' - giving up now!", e);
+                    return Err(e);
+                }
+            }
+        }
+    } else {
+        if !std::io::stdin().is_terminal() || !std::io::stderr().is_terminal() {
+            eprintln!("Cannot prompt for deletion: not running in interactive terminal");
+            return Ok(());
+        }
+        println!("Prompting...");
+        let items: Vec<String> = target_info
+            .iter()
+            .map(|info| format!("{:>10}  {}", format_size(info.size), info.path.display()))
+            .collect();
 
-    let selections = MultiSelect::new()
-        .with_prompt("Select target directories to delete (Space to select, Enter to confirm)")
-        .items(&items)
-        .interact()
-        .map_err(std::io::Error::other)?;
+        let selections = MultiSelect::new()
+            .with_prompt("Select target directories to delete (Space to select, Enter to confirm)")
+            .items(&items)
+            .interact()
+            .map_err(std::io::Error::other)?;
 
-    if selections.is_empty() {
-        println!("No directories selected for deletion");
-        return Ok(());
-    }
+        if selections.is_empty() {
+            println!("No directories selected for deletion");
+            return Ok(());
+        }
 
-    for &idx in &selections {
-        let info = &target_info[idx];
-        println!("Deleting {:?}...", info.path);
-        match fs::remove_dir_all(&info.path) {
-            Ok(_) => println!("  Deleted successfully"),
-            Err(e) => {
-                eprintln!("  Failed to delete: {}", e);
-                return Err(e);
+        for &idx in &selections {
+            let info = &target_info[idx];
+            println!("Deleting {:?}...", info.path);
+            match fs::remove_dir_all(&info.path) {
+                Ok(_) => println!("  Deleted successfully"),
+                Err(e) => {
+                    eprintln!("  Failed to delete: {}", e);
+                    return Err(e);
+                }
             }
         }
     }

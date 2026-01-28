@@ -81,7 +81,7 @@ fn main() -> ExitCode {
         let total_size: u64 = target_info.iter().map(|i| i.size).sum();
         println!("{}", "-".repeat(80));
         println!("{:>10}  Total", format_size(total_size));
-    } else if let Err(e) = handle_deletion(&target_info) {
+    } else if let Err(e) = handle_deletion(&target_info, cli.force) {
         eprintln!("Error during deletion: {}", e);
         return ExitCode::FAILURE;
     }
