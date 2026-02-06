@@ -4,7 +4,7 @@ version = "0.1.1"
 edition = "2024"
 
 [dependencies]
-clap = { version = "4.5.56", features = ["derive", "env"] }
+clap = { version = "4.5.57", features = ["derive", "env"] }
 dialoguer = "0.12.0"
 humanize-bytes = "1.0.6"
 rayon = "1.11.0"
