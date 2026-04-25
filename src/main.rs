@@ -18,6 +18,7 @@ use clean_big_targets::{
 };
 use humanize_bytes::humanize_bytes_decimal;
 use rayon::prelude::*;
+use std::cmp::Reverse;
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
@@ -69,7 +70,7 @@ fn main() -> ExitCode {
         .collect();
 
     // Sort by size (largest first)
-    target_info.sort_by(|a, b| b.size.cmp(&a.size));
+    target_info.sort_by_key(|info| Reverse(info.size));
 
     // Display results
     if !cli.delete {
