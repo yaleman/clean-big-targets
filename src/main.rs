@@ -18,6 +18,7 @@ use clean_big_targets::{
 };
 use humanize_bytes::humanize_bytes_decimal;
 use rayon::prelude::*;
+use std::cmp::Reverse;
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
