@@ -10,7 +10,7 @@
 #![deny(clippy::needless_pass_by_value)]
 #![deny(clippy::trivially_copy_pass_by_ref)]
 
-use std::process::ExitCode;
+use std::{cmp::Reverse, process::ExitCode};
 
 use clap::Parser;
 use clean_big_targets::{
@@ -69,7 +69,7 @@ fn main() -> ExitCode {
         .collect();
 
     // Sort by size (largest first)
-    target_info.sort_by(|a, b| b.size.cmp(&a.size));
+    target_info.sort_by_key(|info| Reverse(info.size));
 
     // Display results
     if !cli.delete {
