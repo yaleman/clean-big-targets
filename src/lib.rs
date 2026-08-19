@@ -1,4 +1,5 @@
 use std::{
+    collections::BTreeSet,
     fs,
     io::IsTerminal,
     path::{Path, PathBuf},
@@ -18,6 +19,9 @@ pub struct Cli {
     pub delete: bool,
     #[clap(long, requires = "delete")]
     pub force: bool,
+
+    #[clap(long, default_value = "5", env = "CLEAN_BIG_TARGETS_MAX_DEPTH")]
+    pub max_depth: u32,
 }
 
 #[derive(Debug)]
@@ -26,8 +30,17 @@ pub struct TargetDirInfo {
     pub size: u64,
 }
 
-pub fn find_target_dirs(base_dir: &Path, debug: bool) -> std::io::Result<Vec<PathBuf>> {
-    let mut target_dirs = Vec::new();
+pub fn find_target_dirs(
+    base_dir: &Path,
+    debug: bool,
+    depth: u32,
+    maxdepth: u32,
+) -> std::io::Result<Vec<PathBuf>> {
+    if depth >= maxdepth {
+        return Ok(Vec::new());
+    }
+
+    let mut target_dirs = BTreeSet::<PathBuf>::new();
 
     for entry in fs::read_dir(base_dir.canonicalize()?)? {
         let entry = entry?;
@@ -42,16 +55,23 @@ pub fn find_target_dirs(base_dir: &Path, debug: bool) -> std::io::Result<Vec<Pat
             return Ok(vec![path]);
         }
 
-        let target_path = path.join("target");
-        if target_path.exists() && target_path.is_dir() {
-            if debug {
-                eprintln!("Found target directory: {:?}", target_path);
+        let sub_target_dirs = find_target_dirs(&path, debug, depth + 1, maxdepth)?;
+        target_dirs.extend(sub_target_dirs);
+
+        // also need to check if there's a Cargo.toml in the same directory, and if so, check if there's a target directory in the same directory
+        let cargo_toml_path = path.join("Cargo.toml");
+        if cargo_toml_path.exists() && cargo_toml_path.is_file() {
+            let target_path = path.join("target");
+            if target_path.exists() && target_path.is_dir() {
+                if debug {
+                    eprintln!("Found target directory: {:?}", target_path);
+                }
+                target_dirs.insert(target_path);
             }
-            target_dirs.push(target_path);
         }
     }
 
-    Ok(target_dirs)
+    Ok(target_dirs.into_iter().collect())
 }
 
 pub fn calculate_dir_size(path: &PathBuf) -> std::io::Result<u64> {
@@ -197,7 +217,7 @@ mod tests {
     #[test]
     fn test_find_target_dirs_none_found() {
         let temp_dir = TempDir::new().unwrap();
-        let result = find_target_dirs(temp_dir.path(), false).unwrap();
+        let result = find_target_dirs(temp_dir.path(), false, 0, 5).unwrap();
         assert_eq!(result.len(), 0);
     }
 
@@ -208,7 +228,7 @@ mod tests {
         fs::create_dir(&project_dir).unwrap();
         fs::create_dir(project_dir.join("target")).unwrap();
 
-        let result = find_target_dirs(temp_dir.path(), false).unwrap();
+        let result = find_target_dirs(temp_dir.path(), false, 0, 5).unwrap();
         assert_eq!(result.len(), 1);
         assert!(result[0].ends_with("project1/target"));
     }
@@ -228,7 +248,7 @@ mod tests {
         let project3 = temp_dir.path().join("project3");
         fs::create_dir(&project3).unwrap();
 
-        let result = find_target_dirs(temp_dir.path(), false).unwrap();
+        let result = find_target_dirs(temp_dir.path(), false, 0, 5).unwrap();
         assert_eq!(result.len(), 2);
     }
 
@@ -241,7 +261,7 @@ mod tests {
         fs::create_dir(&target_dir).unwrap();
 
         // Scanning the parent should find the "target" directory and return it directly
-        let result = find_target_dirs(temp_dir.path(), false).unwrap();
+        let result = find_target_dirs(temp_dir.path(), false, 0, 5).unwrap();
         assert_eq!(result.len(), 1);
         assert!(result[0].ends_with("target"));
     }

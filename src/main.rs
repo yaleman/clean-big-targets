@@ -31,12 +31,20 @@ fn main() -> ExitCode {
         return ExitCode::FAILURE;
     }
 
+    let target_dir = match cli.target_dir.canonicalize().map_err(|e| {
+        eprintln!("Error reading target directory: {}", e);
+        ExitCode::FAILURE
+    }) {
+        Ok(val) => val,
+        Err(code) => return code,
+    };
+
     if cli.debug {
-        eprintln!("Target directory: {:?}", cli.target_dir);
+        eprintln!("Target directory: {}", target_dir.display());
     }
 
     // Find all target directories
-    let target_dirs = match find_target_dirs(&cli.target_dir, cli.debug) {
+    let target_dirs = match find_target_dirs(&target_dir, cli.debug, 0, cli.max_depth) {
         Ok(dirs) => dirs,
         Err(e) => {
             eprintln!("Error scanning directories: {}", e);
