@@ -122,16 +122,15 @@ pub fn handle_deletion(target_info: &[TargetDirInfo], force: bool) -> std::io::R
 
         for &idx in &selections {
             let info = &target_info[idx];
-            match fs::remove_dir_all(&info.path) {
-                Ok(_) => println!(
+            if let Err(e) = fs::remove_dir_all(&info.path) {
+                eprintln!("Failed to delete dir: {} {}", info.path.display(), e);
+                return Err(e);
+            } else {
+                println!(
                     "Deleted '{}' successfully, ({})",
                     info.path.display(),
                     humanize_bytes_decimal!(info.size)
-                ),
-                Err(e) => {
-                    eprintln!("Failed to delete dir: {} {}", info.path.display(), e);
-                    return Err(e);
-                }
+                )
             }
         }
     }
