@@ -129,7 +129,7 @@ pub fn handle_deletion(target_info: &[TargetDirInfo], force: bool) -> std::io::R
                     humanize_bytes_decimal!(info.size)
                 ),
                 Err(e) => {
-                    eprintln!("Failed to delete: {}", e);
+                    eprintln!("Failed to delete dir: {} {}", info.path.display(), e);
                     return Err(e);
                 }
             }
